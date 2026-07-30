@@ -132,6 +132,11 @@ class RealtimeVision:
                 if self._matches(pub) and pub.track is not None:
                     asyncio.create_task(self._start_bridge(pub.track))
 
+    @property
+    def stream_id(self) -> str | None:
+        """The Overshoot stream id, once the first matching track has been captured."""
+        return self._stream_id
+
     # ---------- track selection / bridge ----------
 
     def _matches(self, pub: rtc.RemoteTrackPublication) -> bool:
