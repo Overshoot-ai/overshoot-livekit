@@ -93,6 +93,8 @@ Runnable examples live in [`examples/`](examples/):
 - [`examples/voice_agent.py`](examples/voice_agent.py): a voice agent that sees, showing both
   recommended patterns: ambient scene context injected before each LLM turn, and an on-demand
   `look` tool that can also answer about the recent past.
+- [`examples/tool_calling.py`](examples/tool_calling.py): tool calling only. The LLM decides
+  when to look, and `allow_history=True` lets it ask about the recent past on its own.
 - [`examples/minimal.py`](examples/minimal.py): the smallest integration, no agents framework,
   just a room plus `watch()`, `ask()`, and structured output.
 
