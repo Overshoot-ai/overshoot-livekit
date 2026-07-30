@@ -86,6 +86,16 @@ vision.watch(
 )
 ```
 
+## Examples
+
+Runnable examples live in [`examples/`](examples/):
+
+- [`examples/voice_agent.py`](examples/voice_agent.py): a voice agent that sees, showing both
+  recommended patterns: ambient scene context injected before each LLM turn, and an on-demand
+  `look` tool that can also answer about the recent past.
+- [`examples/minimal.py`](examples/minimal.py): the smallest integration, no agents framework,
+  just a room plus `watch()`, `ask()`, and structured output.
+
 ## Failure behavior
 
 Vision failure never crashes the agent:
