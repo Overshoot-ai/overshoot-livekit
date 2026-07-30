@@ -30,12 +30,12 @@ async def entrypoint(ctx: agents.JobContext) -> None:
 
     agent = Agent(
         instructions="You are a helpful voice assistant. When a question depends on "
-                     "what the user's camera shows, now or recently, use the look tool.",
+        "what the user's camera shows, now or recently, use the look tool.",
         tools=[
             vision.as_tool(
                 name="look",
                 description="Answer a question about what the user's camera shows. "
-                            "Pass seconds_ago to ask about the recent past.",
+                "Pass seconds_ago to ask about the recent past.",
                 window_ms=5000,
                 allow_history=True,
             ),

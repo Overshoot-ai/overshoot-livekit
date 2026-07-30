@@ -17,9 +17,10 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 from livekit import rtc
@@ -57,8 +58,9 @@ class _Api:
             timeout=15.0,
         )
 
-    async def _request(self, method: str, path: str, *, json_body: dict | None = None,
-                       timeout: float | None = None) -> dict:
+    async def _request(
+        self, method: str, path: str, *, json_body: dict | None = None, timeout: float | None = None
+    ) -> dict:
         try:
             resp = await self._http.request(method, path, json=json_body, timeout=timeout)
         except httpx.HTTPError as exc:
@@ -105,8 +107,10 @@ class RealtimeVision:
         base_url: str = DEFAULT_BASE_URL,
     ) -> None:
         if ingest not in ("auto", "republish"):
-            raise ValueError(f"ingest must be 'auto' or 'republish' (got {ingest!r}); "
-                             "'room_join' activates when backend support ships")
+            raise ValueError(
+                f"ingest must be 'auto' or 'republish' (got {ingest!r}); "
+                "'room_join' activates when backend support ships"
+            )
         if track_source not in _TRACK_SOURCES:
             raise ValueError(f"track_source must be one of {sorted(_TRACK_SOURCES)}")
         self._room = room
@@ -147,8 +151,9 @@ class RealtimeVision:
     def _matches(self, pub: rtc.RemoteTrackPublication) -> bool:
         return pub.kind == rtc.TrackKind.KIND_VIDEO and pub.source == self._source
 
-    def _on_track_subscribed(self, track: rtc.Track, pub: rtc.RemoteTrackPublication,
-                             participant: rtc.RemoteParticipant) -> None:
+    def _on_track_subscribed(
+        self, track: rtc.Track, pub: rtc.RemoteTrackPublication, participant: rtc.RemoteParticipant
+    ) -> None:
         if not self._closed and participant.identity == self._identity and self._matches(pub):
             asyncio.create_task(self._start_bridge(track))
 
@@ -233,8 +238,9 @@ class RealtimeVision:
             self._first_frame_epoch_ms = float(base)
         return self._first_frame_epoch_ms
 
-    def _ovs_url(self, window_ms: int, start_ms: float | None, end_ms: float | None,
-                 sample_fps: float | None) -> tuple[str, str]:
+    def _ovs_url(
+        self, window_ms: int, start_ms: float | None, end_ms: float | None, sample_fps: float | None
+    ) -> tuple[str, str]:
         base = f"ovs://streams/{self._stream_id}"
         if start_ms is not None:
             params = [f"start_timestamp_ms={int(start_ms)}"]
@@ -270,12 +276,33 @@ class RealtimeVision:
         start_ms/end_ms = absolute epoch-ms window (end_ms omitted means now).
         schema: a JSON-schema dict (returns dict) or pydantic model class (returns instance).
         """
-        text, data = await self._ask(question, window_ms, start_ms, end_ms, schema,
-                                     model, max_output_tokens, sample_fps, timeout, extra)
+        text, data = await self._ask(
+            question,
+            window_ms,
+            start_ms,
+            end_ms,
+            schema,
+            model,
+            max_output_tokens,
+            sample_fps,
+            timeout,
+            extra,
+        )
         return text if schema is None else data
 
-    async def _ask(self, question, window_ms, start_ms, end_ms, schema, model,
-                   max_output_tokens, sample_fps, timeout, extra) -> tuple[str, Any]:
+    async def _ask(
+        self,
+        question,
+        window_ms,
+        start_ms,
+        end_ms,
+        schema,
+        model,
+        max_output_tokens,
+        sample_fps,
+        timeout,
+        extra,
+    ) -> tuple[str, Any]:
         if self._stream_id is None:
             raise VisionUnavailable("no video track captured yet")
         if start_ms is not None and window_ms:
@@ -290,10 +317,15 @@ class RealtimeVision:
         messages: list[dict] = []
         if self._instructions:
             messages.append({"role": "system", "content": self._instructions})
-        messages.append({"role": "user", "content": [
-            {"type": kind, kind: {"url": url}},
-            {"type": "text", "text": question},
-        ]})
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {"type": kind, kind: {"url": url}},
+                    {"type": "text", "text": question},
+                ],
+            }
+        )
         body: dict = {
             "model": model or self._model,
             "messages": messages,
@@ -312,8 +344,15 @@ class RealtimeVision:
             return text, None
         return text, _parse_structured(text, schema)
 
-    def as_tool(self, name: str, description: str, *, window_ms: int = 5000,
-                timeout: float = 10.0, allow_history: bool = False):
+    def as_tool(
+        self,
+        name: str,
+        description: str,
+        *,
+        window_ms: int = 5000,
+        timeout: float = 10.0,
+        allow_history: bool = False,
+    ):
         """ask() as a LiveKit Agents function tool (returns text for the LLM).
 
         With allow_history, the tool schema gains an optional seconds_ago parameter so
@@ -322,21 +361,30 @@ class RealtimeVision:
         from livekit.agents.llm import function_tool
 
         if allow_history:
+
             async def _look(question: str, seconds_ago: float = 0) -> str:
                 if seconds_ago > 0:
                     end = time.time() * 1000 - seconds_ago * 1000
-                    return await self.ask(question, start_ms=end - window_ms, end_ms=end,
-                                          timeout=timeout)
+                    return await self.ask(
+                        question, start_ms=end - window_ms, end_ms=end, timeout=timeout
+                    )
                 return await self.ask(question, window_ms=window_ms, timeout=timeout)
         else:
+
             async def _look(question: str) -> str:
                 return await self.ask(question, window_ms=window_ms, timeout=timeout)
 
         return function_tool(name=name, description=description)(_look)
 
-    def watch(self, prompt: str, *, interval: float,
-              on_result: Callable[[VisionResult], None],
-              window_ms: int = 0, schema: Any = None) -> asyncio.Task:
+    def watch(
+        self,
+        prompt: str,
+        *,
+        interval: float,
+        on_result: Callable[[VisionResult], None],
+        window_ms: int = 0,
+        schema: Any = None,
+    ) -> asyncio.Task:
         """Sequential background loop: one ask() per tick, results to on_result.
 
         Never overlaps requests (a slow request skips ticks), never raises into the
@@ -349,8 +397,18 @@ class RealtimeVision:
             while not self._closed:
                 t0 = time.monotonic()
                 try:
-                    text, data = await self._ask(prompt, window_ms, None, None, schema,
-                                                 None, None, None, max(interval, 10.0), None)
+                    text, data = await self._ask(
+                        prompt,
+                        window_ms,
+                        None,
+                        None,
+                        schema,
+                        None,
+                        None,
+                        None,
+                        max(interval, 10.0),
+                        None,
+                    )
                 except VisionUnavailable as exc:
                     if exc.status in _FATAL_STATUSES:
                         log.error("watch stopped on fatal error: %s", exc)
@@ -391,8 +449,10 @@ class RealtimeVision:
 
 def _response_format(schema: Any) -> dict:
     if hasattr(schema, "model_json_schema"):
-        return {"type": "json_schema", "json_schema": {
-            "name": schema.__name__, "schema": schema.model_json_schema()}}
+        return {
+            "type": "json_schema",
+            "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema()},
+        }
     if isinstance(schema, dict):
         return {"type": "json_schema", "json_schema": {"name": "response", "schema": schema}}
     raise ValueError("schema must be a JSON-schema dict or a pydantic model class")

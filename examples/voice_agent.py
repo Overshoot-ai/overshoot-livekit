@@ -7,6 +7,13 @@ and the main LLM never waits on vision.
 Mode 2 (on demand): a `look` tool the LLM calls when the conversation needs eyes,
 including questions about the recent past ("what was I holding 30 seconds ago?").
 
+The two modes are complementary, not redundant: the ambient line gives the agent
+standing awareness (who is there, what changed), while the tool answers specific
+questions the watch prompt never covers, and can look back in time to verify
+something. The instructions below tell the LLM exactly when to reach for the tool,
+which prevents it from answering detailed visual questions off the stale ambient
+line. If you only need one mode, see examples/tool_calling.py for tool-only.
+
 Run like any LiveKit agent:
     OVERSHOOT_API_KEY=... LIVEKIT_URL=... LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=... \
         python voice_agent.py dev
@@ -25,17 +32,21 @@ class SeeingAgent(Agent):
     def __init__(self, vision_tools: list) -> None:
         super().__init__(
             instructions="You are a friendly assistant that can see the user. "
-                         "Use what you see naturally; do not narrate that you have vision.",
+            "A [current view] line gives you general awareness; use it for "
+            "casual references to the scene. For any specific visual question, "
+            "anything small or detailed, or anything about the past, call the "
+            "look tool instead of guessing from [current view]. "
+            "Do not narrate that you have vision.",
             tools=vision_tools,
         )
         self.latest_scene: str | None = None
 
-    async def on_user_turn_completed(self, turn_ctx: llm.ChatContext,
-                                     new_message: llm.ChatMessage) -> None:
+    async def on_user_turn_completed(
+        self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage
+    ) -> None:
         # Mode 1: inject the freshest scene line right before the LLM replies.
         if self.latest_scene:
-            turn_ctx.add_message(role="system",
-                                 content=f"[current view] {self.latest_scene}")
+            turn_ctx.add_message(role="system", content=f"[current view] {self.latest_scene}")
 
 
 async def entrypoint(ctx: agents.JobContext) -> None:
@@ -43,21 +54,23 @@ async def entrypoint(ctx: agents.JobContext) -> None:
 
     vision = RealtimeVision(
         room=ctx.room,
-        participant="user",              # selected by identity, never "first video track"
+        participant="user",  # selected by identity, never "first video track"
         api_key=os.environ["OVERSHOOT_API_KEY"],
         instructions="Answer briefly; you are the vision system of a voice assistant.",
     )
 
-    agent = SeeingAgent(vision_tools=[
-        # Mode 2: on-demand look, including the recent past via seconds_ago.
-        vision.as_tool(
-            name="look",
-            description="Answer a question about what the user's camera shows, "
-                        "now or in the recent past.",
-            window_ms=5000,
-            allow_history=True,
-        ),
-    ])
+    agent = SeeingAgent(
+        vision_tools=[
+            # Mode 2: on-demand look, including the recent past via seconds_ago.
+            vision.as_tool(
+                name="look",
+                description="Answer a question about what the user's camera shows, "
+                "now or in the recent past.",
+                window_ms=5000,
+                allow_history=True,
+            ),
+        ]
+    )
 
     def on_scene(result) -> None:
         agent.latest_scene = result.text
