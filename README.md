@@ -88,15 +88,14 @@ vision.watch(
 
 ## Examples
 
-Runnable examples live in [`examples/`](examples/):
+One runnable example per affordance in [`examples/`](examples/):
 
-- [`examples/voice_agent.py`](examples/voice_agent.py): a voice agent that sees, showing both
-  recommended patterns: ambient scene context injected before each LLM turn, and an on-demand
-  `look` tool that can also answer about the recent past.
-- [`examples/tool_calling.py`](examples/tool_calling.py): tool calling only. The LLM decides
-  when to look, and `allow_history=True` lets it ask about the recent past on its own.
-- [`examples/minimal.py`](examples/minimal.py): the smallest integration, no agents framework,
-  just a room plus `watch()`, `ask()`, and structured output.
+- [`examples/watch.py`](examples/watch.py): ambient vision for a voice agent. A fresh scene
+  line is injected into the LLM context before each turn.
+- [`examples/tool_calling.py`](examples/tool_calling.py): the LLM decides when to look via a
+  `look` tool, and `allow_history=True` lets it ask about the recent past on its own.
+- [`examples/ask.py`](examples/ask.py): one-off questions without the agents framework,
+  including trailing windows and structured output.
 
 ## Failure behavior
 

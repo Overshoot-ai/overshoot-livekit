@@ -1,9 +1,9 @@
-"""Smallest possible integration: no agents framework, just a room and questions.
+"""One-off questions: no agents framework, just a room and ask().
 
-Joins a LiveKit room, watches the participant "user", prints a scene line every
-2 seconds, then asks one question about the last 10 seconds and one structured query.
+Joins a LiveKit room, waits for the participant "user" to publish, then asks about
+the latest frame, a trailing window, and once with structured output.
 
-    OVERSHOOT_API_KEY=... LIVEKIT_URL=... LIVEKIT_TOKEN=... python minimal.py
+    OVERSHOOT_API_KEY=... LIVEKIT_URL=... LIVEKIT_TOKEN=... python ask.py
 """
 
 import asyncio
@@ -29,16 +29,12 @@ async def main() -> None:
         participant="user",
         api_key=os.environ["OVERSHOOT_API_KEY"],
     )
-    vision.watch(
-        prompt="In one line, what is happening?",
-        interval=2.0,
-        on_result=lambda r: print(f"[watch] {r.text}"),
-    )
 
-    await asyncio.sleep(30)
+    await asyncio.sleep(15)  # let some video accumulate
 
     try:
-        print("[ask]", await vision.ask("What happened?", window_ms=10_000))
+        print("[latest]", await vision.ask("What do you see? One line."))
+        print("[window]", await vision.ask("What happened?", window_ms=10_000))
         scene = await vision.ask("Describe the scene.", schema=Scene)
         print("[structured]", scene.person_present, "-", scene.description)
     except VisionUnavailable as exc:
