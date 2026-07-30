@@ -5,7 +5,7 @@ Real-time vision for [LiveKit Agents](https://docs.livekit.io/agents/), powered 
 user's camera continuously, answer visual questions on demand, and look back in time.
 
 ```
-pip install overshoot-livekit
+pip install "overshoot-livekit @ git+https://github.com/Overshoot-ai/overshoot-livekit.git"
 ```
 
 ## Quickstart
