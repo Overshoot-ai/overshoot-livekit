@@ -64,13 +64,17 @@ class _Api:
         except httpx.HTTPError as exc:
             raise VisionUnavailable(f"network error: {exc}") from exc
         if resp.status_code >= 400:
+            detail = resp.text[:300] if resp.content else ""
             raise VisionUnavailable(
-                f"{method} {path} -> {resp.status_code}", status=resp.status_code
+                f"{method} {path} -> {resp.status_code}: {detail}", status=resp.status_code
             )
         return resp.json()
 
     async def create_stream(self) -> dict:
         return await self._request("POST", "/streams", json_body={})
+
+    async def get_stream(self, stream_id: str) -> dict:
+        return await self._request("GET", f"/streams/{stream_id}")
 
     async def keepalive(self, stream_id: str) -> dict:
         return await self._request("POST", f"/streams/{stream_id}/keepalive")
@@ -115,6 +119,7 @@ class RealtimeVision:
         self._api = _Api(api_key, base_url)
 
         self._stream_id: str | None = None
+        self._first_frame_epoch_ms: float | None = None
         self._publish_room: rtc.Room | None = None
         self._video_source: rtc.VideoSource | None = None
         self._bridge_task: asyncio.Task | None = None
@@ -217,6 +222,17 @@ class RealtimeVision:
 
     # ---------- inference ----------
 
+    async def _first_frame_base(self) -> float:
+        """Epoch ms of the stream's first frame; cached (it never changes)."""
+        if self._first_frame_epoch_ms is None:
+            assert self._stream_id is not None
+            status = await self._api.get_stream(self._stream_id)
+            base = status.get("first_frame_at_ms")
+            if base is None:
+                raise VisionUnavailable("stream has no frames yet")
+            self._first_frame_epoch_ms = float(base)
+        return self._first_frame_epoch_ms
+
     def _ovs_url(self, window_ms: int, start_ms: float | None, end_ms: float | None,
                  sample_fps: float | None) -> tuple[str, str]:
         base = f"ovs://streams/{self._stream_id}"
@@ -264,6 +280,12 @@ class RealtimeVision:
             raise VisionUnavailable("no video track captured yet")
         if start_ms is not None and window_ms:
             raise ValueError("pass either window_ms or start_ms/end_ms, not both")
+        if start_ms is not None:
+            # Public API is epoch ms; ovs:// timestamp_ms is stream time (ms since
+            # the first captured frame), so convert against the stream's base.
+            base = await self._first_frame_base()
+            start_ms = max(0.0, start_ms - base)
+            end_ms = None if end_ms is None else max(0.0, end_ms - base)
         kind, url = self._ovs_url(window_ms, start_ms, end_ms, sample_fps)
         messages: list[dict] = []
         if self._instructions:
